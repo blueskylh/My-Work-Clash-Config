@@ -1,0 +1,34 @@
+name: 每日自动更新配置
+
+# 触发条件
+on:
+  workflow_dispatch: # 允许你手动点击按钮触发测试
+  schedule:
+    - cron: '0 20 * * *' # UTC时间周五晚上8点（北京时间周六凌晨4点），每周一次
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 迁出代码 (Checkout)
+        uses: actions/checkout@v3
+        
+      - name: 安装 Python 环境
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: 安装依赖
+        run: pip install requests
+
+      - name: 运行修改脚本
+        run: python up.py
+
+      - name: 提交并推送到仓库
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add ACL4SSR_Custom.ini
+          git commit -m "Auto update config" || exit 0
+          git push
