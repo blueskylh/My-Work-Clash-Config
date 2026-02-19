@@ -8,9 +8,8 @@ url = "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL
 # 2. 下载文件 (增加超时与异常处理)
 print("正在下载官方配置...")
 try:
-    # 设置 10 秒超时，避免网络问题导致脚本无限挂起
     r = requests.get(url, timeout=10)
-    r.raise_for_status() # 如果状态码不是 200，主动抛出异常
+    r.raise_for_status() 
     content = r.text
 except requests.RequestException as e:
     print(f"❌ 下载失败，网络请求异常: {e}")
@@ -34,7 +33,7 @@ custom_proxy_group=自定义日常工作`url-test`[]自定义香港IEPL负载均
 # 4. 执行自动化修改逻辑
 # ===============================================================
 
-# 【修改操作 A】插入新策略组定义 (仅替换第一处标志位)
+# 【修改操作 A】插入新策略组定义
 if ";设置分组标志位" in content:
     content = content.replace(";设置分组标志位", ";设置分组标志位\n" + new_groups_def, 1)
 else:
@@ -43,7 +42,6 @@ print("✅ 已创建 3 个自定义策略组")
 
 
 # 【修改操作 B】修改 "🚀 节点选择" 
-# 替换 `select`[] 确保准确插入到第一个选项位置
 content = content.replace(
     "custom_proxy_group=🚀 节点选择`select`[]", 
     "custom_proxy_group=🚀 节点选择`select`[]自定义日常工作`[]",
@@ -63,19 +61,17 @@ content = re.sub(
 print("✅ 已修改 [💬 Ai平台] 为仅筛选 GPT/Gemini/Ai")
 
 
-# 【修改操作 D】添加“临时测试”分组 (优化插入位置)
-new_test_group = "custom_proxy_group=临时测试`select`.*\n"
+# 【修改操作 D】添加“临时测试”分组 (包含 .*、REJECT、DIRECT)
+new_test_group = "custom_proxy_group=临时测试`select`.*`[]REJECT`[]DIRECT\n"
 last_marker = ";设置分组标志位"
-last_idx = content.rfind(last_marker) # 查找文件中最后一个标志位的位置
+last_idx = content.rfind(last_marker)
 
 if last_idx != -1 and last_idx != content.find(last_marker):
-    # 找到了文件末尾的那个闭合标志位，将新分组插在它正上方
     content = content[:last_idx] + new_test_group + content[last_idx:]
-    print("✅ 已在分组列表末尾安全添加 [临时测试] 分组")
+    print("✅ 已在分组列表末尾安全添加 [临时测试] 分组（含 REJECT/DIRECT）")
 else:
-    # 备用方案：如果没找到第二个标志位，则插在 enable_rule_generator 参数前
     content = content.replace("enable_rule_generator=true", new_test_group + "enable_rule_generator=true")
-    print("✅ 已通过备用方案添加 [临时测试] 分组")
+    print("✅ 已通过备用方案添加 [临时测试] 分组（含 REJECT/DIRECT）")
 
 
 # ===============================================================
