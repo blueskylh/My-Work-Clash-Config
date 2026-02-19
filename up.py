@@ -5,7 +5,7 @@ import sys
 # 1. 定义官方源地址
 url = "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online_Full_MultiMode.ini"
 
-# 2. 下载文件 (增加超时与异常处理)
+# 2. 下载文件
 print("正在下载官方配置...")
 try:
     r = requests.get(url, timeout=10)
@@ -61,17 +61,34 @@ content = re.sub(
 print("✅ 已修改 [💬 Ai平台] 为仅筛选 GPT/Gemini/Ai")
 
 
-# 【修改操作 D】添加“临时测试”分组 (包含 .*、REJECT、DIRECT)
-new_test_group = "custom_proxy_group=临时测试`select`.*`[]REJECT`[]DIRECT\n"
+# 【修改操作 D】动态提取所有分组，并生成“临时测试”
+# 1. 使用正则抓取当前 content 中所有的策略组名称
+all_group_names = re.findall(r"^custom_proxy_group=([^`\n]+)`", content, flags=re.MULTILINE)
+
+# 2. 去重（保持原有的顺序）
+unique_groups = []
+seen = set()
+for name in all_group_names:
+    if name not in seen:
+        seen.add(name)
+        unique_groups.append(name)
+
+# 3. 将所有分组名称拼接成 subconverter 支持的格式: `[]分组1`[]分组2...
+groups_str = "".join([f"`[]{g}" for g in unique_groups])
+
+# 4. 组装“临时测试” (顺序：REJECT -> DIRECT -> 所有分组 -> .*所有单节点)
+new_test_group = f"custom_proxy_group=临时测试`select`[]REJECT`[]DIRECT{groups_str}`.*\n"
+
+# 5. 插入到文件末尾的安全位置
 last_marker = ";设置分组标志位"
 last_idx = content.rfind(last_marker)
 
 if last_idx != -1 and last_idx != content.find(last_marker):
     content = content[:last_idx] + new_test_group + content[last_idx:]
-    print("✅ 已在分组列表末尾安全添加 [临时测试] 分组（含 REJECT/DIRECT）")
+    print("✅ 已动态抓取所有分组，并在末尾添加 [临时测试] 分组")
 else:
     content = content.replace("enable_rule_generator=true", new_test_group + "enable_rule_generator=true")
-    print("✅ 已通过备用方案添加 [临时测试] 分组（含 REJECT/DIRECT）")
+    print("✅ 已通过备用方案添加 [临时测试] 分组")
 
 
 # ===============================================================
