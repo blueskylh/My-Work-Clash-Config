@@ -18,12 +18,14 @@ except requests.RequestException as e:
 print("✅ 下载成功，开始修改配置...")
 
 # ===============================================================
-# 3. 定义你要添加的策略组（不在此处直接写入 health-check 块，后面统一追加 YAML 块）
+# 3. 定义你要添加的策略组（行内 health-check 将以反引号字段形式追加）
+#    health-check 行内格式：`health-check`<url>`<interval>`<tolerance>
+#    例如：`health-check`https://www.gstatic.com/generate_204`60`2
 # ===============================================================
 new_groups_def = """
 ; === 自定义新增策略组 Start ===
-custom_proxy_group=自定义香港高级BGP负载均衡`load-balance`(香港 高级中继)`http://www.gstatic.com/generate_204`300,,50
-custom_proxy_group=自定义香港IEPL负载均衡`load-balance`(香港 IEPL)`http://www.gstatic.com/generate_204`300,,50
+custom_proxy_group=自定义香港高级BGP负载均衡`load-balance`(香港 高级中继)`http://www.gstatic.com/generate_204`300,,50`health-check`https://www.gstatic.com/generate_204`60`2
+custom_proxy_group=自定义香港IEPL负载均衡`load-balance`(香港 IEPL)`http://www.gstatic.com/generate_204`300,,50`health-check`https://www.gstatic.com/generate_204`60`2
 custom_proxy_group=自定义日常工作`fallback`[]自定义香港IEPL负载均衡`[]自定义香港高级BGP负载均衡`[]♻️ 自动选择`http://www.gstatic.com/generate_204`300,,50
 ; === 自定义新增策略组 End ===
 """
@@ -36,7 +38,7 @@ if ";设置分组标志位" in content:
     content = content.replace(";设置分组标志位", ";设置分组标志位\n" + new_groups_def, 1)
 else:
     content = content.replace("[custom]", "[custom]\n" + new_groups_def)
-print("✅ 已创建 3 个自定义策略组（尚未追加 health-check 块）")
+print("✅ 已创建 3 个自定义策略组（其中两个已包含行内 health-check 字段）")
 
 # 【修改操作 B】修改 "🚀 节点选择" 
 content = content.replace(
@@ -56,7 +58,26 @@ content = re.sub(
 )
 print("✅ 已修改 [💬 Ai平台] 为仅筛选 GPT/Gemini/Ai")
 
-# 【修改操作 D】动态提取所有分组，并生成“临时测试”
+# ===============================================================
+# 5. 确保 ♻️ 自动选择 行内追加 health-check（若尚未存在）
+#    使用与上面相同的行内字段格式：`health-check`https://www.gstatic.com/generate_204`60`2
+# ===============================================================
+auto_pattern = r"(^custom_proxy_group=♻️ 自动选择[^\n]*)"
+m_auto = re.search(auto_pattern, content, flags=re.MULTILINE)
+if m_auto:
+    auto_line = m_auto.group(1)
+    if "health-check" in auto_line:
+        print("ℹ️ [♻️ 自动选择] 已包含 health-check，跳过追加。")
+    else:
+        new_auto_line = auto_line + "`health-check`https://www.gstatic.com/generate_204`60`2"
+        content = content.replace(auto_line, new_auto_line, 1)
+        print("✅ 已在 [♻️ 自动选择] 行追加行内 health-check 字段。")
+else:
+    print("⚠️ 未找到 [♻️ 自动选择] 行，无法追加行内 health-check（请确认原始文件结构）。")
+
+# ===============================================================
+# 6. 动态提取所有分组，并生成“临时测试” （保持原逻辑）
+# ===============================================================
 # 1. 使用正则抓取当前 content 中所有的策略组名称
 all_group_names = re.findall(r"^custom_proxy_group=([^`\n]+)`", content, flags=re.MULTILINE)
 
@@ -86,42 +107,7 @@ else:
     print("✅ 已通过备用方案添加 [临时测试] 分组")
 
 # ===============================================================
-# 5. 在指定分组后追加 YAML 风格的 health-check 块（按用户要求的完整块）
-#    目标分组：自定义香港高级BGP负载均衡、 自定义香港IEPL负载均衡、 ♻️ 自动选择
-# ===============================================================
-health_block = (
-    "\nhealth-check:\n"
-    "  enable: true\n"
-    "  url: https://www.gstatic.com/generate_204\n"
-    "  interval: 60\n"
-    "  tolerance: 2\n"
-)
-
-targets = [
-    "自定义香港高级BGP负载均衡",
-    "自定义香港IEPL负载均衡",
-    "♻️ 自动选择"
-]
-
-# 对每个目标分组，查找第一处匹配行并在该行之后插入 health_block（若后面已存在 health-check 则跳过）
-for t in targets:
-    # 构造匹配模式：以 custom_proxy_group=<name> 开头的一整行
-    pattern = rf"^custom_proxy_group={re.escape(t)}[^\n]*\n"
-    m = re.search(pattern, content, flags=re.MULTILINE)
-    if m:
-        insert_pos = m.end()
-        # 检查插入位置后的一段内容是否已经包含 health-check，避免重复添加
-        following = content[insert_pos: insert_pos + 400]
-        if "health-check" in following:
-            print(f"ℹ️ 目标分组 [{t}] 后已存在 health-check，跳过添加。")
-        else:
-            content = content[:insert_pos] + health_block + content[insert_pos:]
-            print(f"✅ 已在分组 [{t}] 后追加 health-check 块。")
-    else:
-        print(f"⚠️ 未找到分组 [{t}]，无法追加 health-check（请确认分组名是否存在或已正确插入）。")
-
-# ===============================================================
-# 6. 保存为新文件
+# 7. 保存为新文件
 # ===============================================================
 filename = "ACL4SSR_Custom.ini"
 try:
