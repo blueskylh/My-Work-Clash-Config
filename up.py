@@ -25,7 +25,7 @@ new_groups_def = """
 ; === 自定义新增策略组 Start ===
 custom_proxy_group=自定义香港高级BGP负载均衡`load-balance`(香港 高级中继)`http://www.gstatic.com/generate_204`300,,50
 custom_proxy_group=自定义香港IEPL负载均衡`load-balance`(香港 IEPL)`http://www.gstatic.com/generate_204`300,,50
-custom_proxy_group=自定义日常工作`url-test`[]自定义香港IEPL负载均衡`[]自定义香港高级BGP负载均衡`[]♻️ 自动选择`http://www.gstatic.com/generate_204`300,,50
+custom_proxy_group=自定义日常工作`fallback`[]自定义香港IEPL负载均衡`[]自定义香港高级BGP负载均衡`[]♻️ 自动选择`http://www.gstatic.com/generate_204`300,,50
 ; === 自定义新增策略组 End ===
 """
 
